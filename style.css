@@ -96,13 +96,11 @@ body {
     background-color: #45a049;
 }
 
-#replay-button,
-#export-button {
+#replay-button {
     background-color: #2196F3;
 }
 
-#replay-button:hover,
-#export-button:hover {
+#replay-button:hover {
     background-color: #0b7dda;
 }
 
@@ -167,4 +165,3 @@ body {
 #download-replay:hover {
     background-color: #0b7dda;
 }
-

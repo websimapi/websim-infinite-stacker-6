@@ -138,7 +138,6 @@ function init() {
 
     restartButton.addEventListener('click', restart);
     replayButton.addEventListener('click', viewReplay);
-    exportButton.addEventListener('click', exportReplay);
     closeReplayButton.addEventListener('click', closeReplay);
     downloadReplayButton.addEventListener('click', downloadReplay);
 
@@ -201,21 +200,6 @@ async function viewReplay() {
     
     replayButton.disabled = false;
     replayButton.textContent = 'Watch Replay';
-}
-
-async function exportReplay() {
-    exportButton.disabled = true;
-    exportButton.textContent = 'Exporting...';
-    
-    if (!currentReplayBlob) {
-        const blob = await replayRecorder.getReplayBlob();
-        currentReplayBlob = blob;
-    }
-    
-    downloadReplay();
-    
-    exportButton.disabled = false;
-    exportButton.textContent = 'Export Video';
 }
 
 function closeReplay() {
