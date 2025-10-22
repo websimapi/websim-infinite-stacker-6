@@ -5,9 +5,9 @@ export function setupScene() {
     const scene = new THREE.Scene();
     const world = new CANNON.World({
         gravity: new CANNON.Vec3(0, -9.82, 0),
-        broadphase: new CANNON.SAPBroadphase(world),
         allowSleep: true,
     });
+    world.broadphase = new CANNON.SAPBroadphase(world);
     world.solver.iterations = 20;
 
     const defaultMaterial = new CANNON.Material('default');
@@ -38,4 +38,3 @@ export function setupScene() {
     
     return { scene, world, camera, renderer, defaultMaterial };
 }
-
