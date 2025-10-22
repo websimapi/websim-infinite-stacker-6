@@ -30,70 +30,63 @@ let defaultMaterial;
 
 // Replay system
 let replayRecorder = null;
-let replayStream = null;
 let currentReplayBlob = null;
 
 class ReplayRecorder {
-    constructor(canvas) {
+    constructor(canvas, fps = 30) {
         this.canvas = canvas;
-        this.frames = [];
-        this.isRecording = true;
-    }
+        this.chunks = [];
+        this.isRecording = false;
 
-    capture() {
-        if (!this.isRecording) return;
-        
-        // Convert canvas to blob and store frame data
-        this.canvas.toBlob((blob) => {
-            this.frames.push(blob);
-        }, 'image/png');
-    }
+        try {
+            const stream = this.canvas.captureStream(fps);
+            const mimeTypes = [
+                'video/webm;codecs=vp9',
+                'video/webm;codecs=vp8',
+                'video/webm',
+            ];
+            const supportedMimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type));
 
-    async render() {
-        return new Promise((resolve) => {
-            const videoCanvas = document.createElement('canvas');
-            videoCanvas.width = this.canvas.width;
-            videoCanvas.height = this.canvas.height;
-            const ctx = videoCanvas.getContext('2d');
+            if (!supportedMimeType) {
+                console.error("No supported mimeType for MediaRecorder");
+                return;
+            }
 
-            const stream = videoCanvas.captureStream(30);
-            const mediaRecorder = new MediaRecorder(stream, {
-                mimeType: 'video/webm;codecs=vp9',
+            this.mediaRecorder = new MediaRecorder(stream, {
+                mimeType: supportedMimeType,
                 videoBitsPerSecond: 5000000
             });
-
-            const chunks = [];
-            mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
-            mediaRecorder.onstop = () => {
-                const blob = new Blob(chunks, { type: 'video/webm' });
-                resolve(blob);
-            };
-
-            mediaRecorder.start();
-
-            // Draw all frames sequentially
-            let frameIndex = 0;
-            const drawNextFrame = async () => {
-                if (frameIndex < this.frames.length) {
-                    const blob = this.frames[frameIndex];
-                    const img = new Image();
-                    img.onload = () => {
-                        ctx.drawImage(img, 0, 0);
-                        frameIndex++;
-                        setTimeout(drawNextFrame, 1000 / 30);
-                    };
-                    img.src = URL.createObjectURL(blob);
-                } else {
-                    mediaRecorder.stop();
+            
+            this.mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) {
+                    this.chunks.push(e.data);
                 }
             };
 
-            drawNextFrame();
-        });
+            this.recordPromise = new Promise((resolve) => {
+                this.mediaRecorder.onstop = () => {
+                    const blob = new Blob(this.chunks, { type: supportedMimeType });
+                    this.chunks = [];
+                    resolve(blob);
+                };
+            });
+
+            this.mediaRecorder.start();
+            this.isRecording = true;
+        } catch (e) {
+            console.error("Error initializing MediaRecorder:", e);
+        }
     }
 
     stop() {
+        if (this.isRecording && this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+            this.mediaRecorder.stop();
+        }
         this.isRecording = false;
+    }
+
+    async getReplayBlob() {
+        return this.recordPromise;
     }
 }
 
@@ -198,7 +191,7 @@ async function viewReplay() {
     replayButton.disabled = true;
     replayButton.textContent = 'Rendering...';
     
-    const blob = await replayRecorder.render();
+    const blob = await replayRecorder.getReplayBlob();
     currentReplayBlob = blob;
     const url = URL.createObjectURL(blob);
     replayVideo.src = url;
@@ -215,11 +208,11 @@ async function exportReplay() {
     exportButton.textContent = 'Exporting...';
     
     if (!currentReplayBlob) {
-        const blob = await replayRecorder.render();
+        const blob = await replayRecorder.getReplayBlob();
         currentReplayBlob = blob;
     }
     
-    downloadReplayButton.click();
+    downloadReplay();
     
     exportButton.disabled = false;
     exportButton.textContent = 'Export Video';
@@ -488,11 +481,6 @@ function shatterBlock(overhang) {
 
 function animate() {
     world.step(1 / 60);
-    
-    // Capture frame for replay
-    if (gameState === 'playing' && replayRecorder) {
-        replayRecorder.capture();
-    }
     
     const newOverhangs = [];
     const stackHeight = BLOCK_HEIGHT * stack.length;
